@@ -56,7 +56,35 @@
 
 - Mushroom-Dashboard für kompakte Bedienung
 
+## v2.1 – Notladeschutz & Sommer-Update (Aktuell)
+**Neu**
+- Notladeschutz: sobald SOC ≤ 8 % → automatische Notladung mit 300 W
+- Eigene Slider für Notlade-Leistung und Notfall-SOC
+- Sommermodus erweitert:
+  - Laden mit PV-Überschuss (mit 50 W Puffer)
+  - Laden bei billigen Preisen (<= 0,05 €/kWh)
+  - Volllast bei Gratis/negativen Preisen
+  - Abends automatische Entladung, sobald PV < 100W
+- 5-Min-Watchdog zur Selbstaktivierung
+
+**Verbessert**
+- Stabilerer Überschussalgorithmus
+- Entladung unabhängig von Prognose
+- Keine Tiefentladung mehr möglich
+- Grenzen komplett über Dashboard konfigurierbar
+
+**Erfordert**
+- 2 neue input_number-Helfer  
+  - `zendure_soc_notfall_min`  
+  - `zendure_notladeleistung`
+
 ---
+
+## v2.0 – Automatik + Prognose
+- Dynamische Lade- und Entladeleistung
+- Preisbasiert: billig Laden, teuer Entladen
+- Ziel-SoC, Reserve-SoC, Leistungsgrenzen über Dashboard
+- Prognose-basierte Entladeplanung
 
 ## v1.0 – Basic Control (2025-01)
 - Laden und Entladen abhängig von PV, Strompreis und SOC

@@ -23,7 +23,7 @@ Sie enthält:
 - Installation
 - Template-Sensoren
 - Helfer (`input_number`)
-- Haupt-Automation (V4)
+- Haupt-Automation (V6)
 - Sofort-Übernahme der Slider
 - Debug-Auswertungen
 - Dashboard-Konfiguration
@@ -56,7 +56,7 @@ Damit die Automatik funktioniert, müssen folgende Entitäten vorhanden sein:
 
 Name | Funktion
 -----|---------
-`Zendure Akku Automatik (V4)` | Smart-Charging, Entladeplanung, Prognose, Reserve-SOC
+`Zendure Akku Automatik (V6)` | Smart-Charging, Entladeplanung, Prognose, Reserve-SOC
 `Zendure – Max Ladeleistung übernehmen` | Sofortiges Anwenden des Lade-Sliders
 `Zendure – Max Entladeleistung übernehmen` | Sofortiges Anwenden des Entlade-Sliders
 
@@ -122,6 +122,7 @@ input_select:
     options:
       - Automatik
       - Sommer
+      - Manuell
     icon: mdi:battery-sync
 
 input_number:

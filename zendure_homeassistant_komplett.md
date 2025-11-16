@@ -137,187 +137,194 @@ template:
 
 ---
 
-## 3) Haupt-Automation (V4 – Prognose & dynamische Mindestenergie)
+## 3) Haupt-Automation (V6 – Prognose & dynamische Mindestenergie)
 
 ```yaml
-alias: Zendure Akku Automatik (V4 – Prognose, dynamische Mindestenergie, FIX)
-description: Vollautomatische Optimierung von Laden/Entladen mit Preisprognose
+alias: Zendure Akku Automatik (V6 final)
+description: Intelligente Akku-Steuerung inkl. Sommermodus, Manuell & Notladeschutz
+triggers:
+  - entity_id:
+      - sensor.zendure_akku_steuerungsempfehlung
+      - sensor.sb2_5_1vl_40_401_pv_power
+      - sensor.electricity_price_paul_schneider_strasse_39
+      - sensor.gesamtverbrauch
+      - sensor.einspeisung
+      - input_select.zendure_betriebsmodus
+    trigger: state
+  - minutes: /5
+    trigger: time_pattern
+actions:
+  - variables:
+      soc: "{{ states('sensor.solarflow_2400_ac_electric_level') | float(0) }}"
+      soc_min: "{{ states('input_number.zendure_soc_reserve_min') | float(15) }}"
+      soc_max: "{{ states('input_number.zendure_soc_ziel_max') | float(95) }}"
+      soc_notfall: "{{ states('input_number.zendure_soc_notfall_min') | float(8) }}"
+      notlade: "{{ states('input_number.zendure_notladeleistung') | float(300) }}"
+      pv: "{{ states('sensor.sb2_5_1vl_40_401_pv_power') | float(0) }}"
+      einspeisung: "{{ states('sensor.einspeisung') | float(0) }}"
+      haus: "{{ states('sensor.gesamtverbrauch') | float(0) }}"
+      netto: "{{ [haus - pv, 0] | max }}"
+      price: >-
+        {{ states('sensor.electricity_price_paul_schneider_strasse_39') |
+        float(0) }}
+      preis_teuer: "{{ states('input_number.zendure_schwelle_teuer') | float(0.40) }}"
+      modus: >-
+        {{ states('input_select.zendure_betriebsmodus') | default('Automatik')
+        }}
+      max_charge: "{{ states('input_number.zendure_max_ladeleistung') | float(2000) }}"
+      max_out: "{{ states('input_number.zendure_max_entladeleistung') | float(600) }}"
+      sommer_pv_low: 100
+      sommer_cheap: 0.05
+      sommer_free: 0
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ soc <= soc_min }}"
+        sequence:
+          - target:
+              entity_id: select.solarflow_2400_ac_ac_mode
+            data:
+              option: input
+            action: select.select_option
+          - target:
+              entity_id: number.solarflow_2400_ac_input_limit
+            data:
+              value: "{{ notlade }}"
+            action: number.set_value
+          - target:
+              entity_id: number.solarflow_2400_ac_output_limit
+            data:
+              value: "0"
+            action: number.set_value
+  - condition: template
+    value_template: "{{ soc > soc_min }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ modus == 'Manuell' }}"
+        sequence: []
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ modus == 'Sommer' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ pv > sommer_pv_low and soc < soc_max }}"
+                sequence:
+                  - target:
+                      entity_id: select.solarflow_2400_ac_ac_mode
+                    data:
+                      option: input
+                    action: select.select_option
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "{{ [pv - 50, max_charge] | min }}"
+                    action: number.set_value
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ price <= sommer_cheap and soc < soc_max }}"
+                sequence:
+                  - target:
+                      entity_id: select.solarflow_2400_ac_ac_mode
+                    data:
+                      option: input
+                    action: select.select_option
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "{{ max_charge }}"
+                    action: number.set_value
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ price <= sommer_free and soc < soc_max }}"
+                sequence:
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "{{ max_charge }}"
+                    action: number.set_value
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ pv < sommer_pv_low and soc > soc_min }}"
+                sequence:
+                  - target:
+                      entity_id: select.solarflow_2400_ac_ac_mode
+                    data:
+                      option: output
+                    action: select.select_option
+                  - target:
+                      entity_id: number.solarflow_2400_ac_output_limit
+                    data:
+                      value: "{{ [netto, max_out] | min }}"
+                    action: number.set_value
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "0"
+                    action: number.set_value
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ modus == 'Automatik' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ einspeisung > 0 and soc < soc_max }}"
+                sequence:
+                  - target:
+                      entity_id: select.solarflow_2400_ac_ac_mode
+                    data:
+                      option: input
+                    action: select.select_option
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "{{ [einspeisung - 50, max_charge] | min }}"
+                    action: number.set_value
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ price >= preis_teuer and soc > soc_min }}"
+                sequence:
+                  - target:
+                      entity_id: select.solarflow_2400_ac_ac_mode
+                    data:
+                      option: output
+                    action: select.select_option
+                  - target:
+                      entity_id: number.solarflow_2400_ac_output_limit
+                    data:
+                      value: "{{ [netto, max_out] | min }}"
+                    action: number.set_value
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "0"
+                    action: number.set_value
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ einspeisung <= 0 and price < preis_teuer }}"
+                sequence:
+                  - target:
+                      entity_id: number.solarflow_2400_ac_output_limit
+                    data:
+                      value: "0"
+                    action: number.set_value
+                  - target:
+                      entity_id: number.solarflow_2400_ac_input_limit
+                    data:
+                      value: "0"
+                    action: number.set_value
 mode: single
 
-trigger:
-  - platform: state
-    entity_id: sensor.zendure_akku_steuerungsempfehlung
-
-variables:
-  soc: "{{ states('sensor.solarflow_2400_ac_electric_level') | float }}"
-  soc_min: "{{ states('input_number.zendure_soc_reserve_min') | float }}"
-  soc_max: "{{ states('input_number.zendure_soc_ziel_max') | float }}"
-  price: "{{ states('sensor.electricity_price_paul_schneider_strasse_39') | float }}"
-  expensive: "{{ states('input_number.zendure_schwelle_teuer') | float(0.40) }}"
-  very_expensive: "{{ states('input_number.zendure_schwelle_extrem') | float(0.50) }}"
-  available_kwh: "{{ states('sensor.solarflow_2400_ac_available_kwh') | float }}"
-  planned_w: "{{ states('sensor.zendure_geplante_entladeleistung') | float }}"
-  needed_kwh: "{{ (planned_w / 1000) * 1.5 }}"
-  prognose: "{{ states('sensor.zendure_naechstes_teures_zeitfenster') }}"
-
-condition: []
-
-action:
-  - choose:
-
-      # 1) ENTLADEEMPFEHLUNG – AKKU ZU LEER → VOR-LADEN
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.to_state.state == 'entladen'
-                 and soc > soc_min
-                 and available_kwh < needed_kwh }}
-        sequence:
-          - service: select.select_option
-            target:
-              entity_id: select.solarflow_2400_ac_ac_mode
-            data:
-              option: input
-          - service: number.set_value
-            target:
-              entity_id: number.solarflow_2400_ac_input_limit
-            data:
-              value: "{{ states('input_number.zendure_max_ladeleistung') | float }}"
-          - service: number.set_value
-            target:
-              entity_id: number.solarflow_2400_ac_output_limit
-            data:
-              value: "0"
-
-      # 2) ENTLADEEMPFEHLUNG – GENUG ENERGIE → ENTLADEN
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.to_state.state == 'entladen'
-                 and soc > soc_min
-                 and available_kwh >= needed_kwh }}
-        sequence:
-          - service: select.select_option
-            target:
-              entity_id: select.solarflow_2400_ac_ac_mode
-            data:
-              option: output
-
-          - variables:
-              haus: "{{ states('sensor.gesamtverbrauch') | float }}"
-              pv: "{{ states('sensor.sb2_5_1vl_40_401_pv_power') | float }}"
-              netto: "{{ [haus - pv, 0] | max }}"
-              max_out: "{{ states('input_number.zendure_max_entladeleistung') | float }}"
-
-          - choose:
-              # 2a) EXTREM TEUER → maximale Entladung
-              - conditions:
-                  - condition: template
-                    value_template: "{{ price >= very_expensive }}"
-                sequence:
-                  - service: number.set_value
-                    target:
-                      entity_id: number.solarflow_2400_ac_output_limit
-                    data:
-                      value: "{{ [max_out, netto] | min | round(0) }}"
-                  - service: number.set_value
-                    target:
-                      entity_id: number.solarflow_2400_ac_input_limit
-                    data:
-                      value: "0"
-
-              # 2b) TEUER → smarte Entladung
-              - conditions:
-                  - condition: template
-                    value_template: "{{ price >= expensive }}"
-                sequence:
-                  - variables:
-                      smart: "{{ [planned_w, max_out, netto] | min }}"
-                  - service: number.set_value
-                    target:
-                      entity_id: number.solarflow_2400_ac_output_limit
-                    data:
-                      value: "{{ [smart, 0] | max | round(0) }}"
-                  - service: number.set_value
-                    target:
-                      entity_id: number.solarflow_2400_ac_input_limit
-                    data:
-                      value: "0"
-
-            # 2c) Preis doch nicht teuer → stoppen
-            default:
-              - service: number.set_value
-                target:
-                  entity_id: number.solarflow_2400_ac_output_limit
-                data:
-                  value: "0"
-              - service: number.set_value
-                target:
-                  entity_id: number.solarflow_2400_ac_input_limit
-                data:
-                  value: "0"
-
-      # 3) LADEN – Empfehlung ODER Voraus-Laden für teures Fenster
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ (trigger.to_state.state in ['laden','billig_laden'] and soc < soc_max)
-                 or (prognose == 'teuer' and available_kwh < needed_kwh and soc < soc_max) }}
-        sequence:
-          - service: select.select_option
-            target:
-              entity_id: select.solarflow_2400_ac_ac_mode
-            data:
-              option: input
-
-          - variables:
-              max_charge: "{{ states('input_number.zendure_max_ladeleistung') | float }}"
-              einspeisung: "{{ states('sensor.einspeisung') | float }}"
-              ueberschuss: "{{ [einspeisung, 0] | max }}"
-              taper: >
-                {% set span = 5 %}
-                {% set rem = soc_max - soc %}
-                {% if rem <= 0 %} 0
-                {% elif rem >= span %} 1
-                {% else %} {{ rem / span }}
-                {% endif %}
-              limit_base: >
-                {% if trigger.to_state.state == 'billig_laden' %}
-                  {{ max_charge }}
-                {% else %}
-                  {{ [ueberschuss, max_charge] | min }}
-                {% endif %}
-              charge_limit: "{{ (limit_base * taper) | float }}"
-
-          - service: number.set_value
-            target:
-              entity_id: number.solarflow_2400_ac_input_limit
-            data:
-              value: "{{ [charge_limit, 0] | max | round(0) }}"
-          - service: number.set_value
-            target:
-              entity_id: number.solarflow_2400_ac_output_limit
-            data:
-              value: "0"
-
-      # 4) STANDBY / STOP
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ trigger.to_state.state == 'standby'
-                 or (trigger.to_state.state in ['laden','billig_laden'] and soc >= soc_max)
-                 or (trigger.to_state.state == 'entladen' and soc <= soc_min) }}
-        sequence:
-          - service: number.set_value
-            target:
-              entity_id: number.solarflow_2400_ac_input_limit
-            data:
-              value: "0"
-          - service: number.set_value
-            target:
-              entity_id: number.solarflow_2400_ac_output_limit
-            data:
-              value: "0"
 ```
 
 ---

@@ -41,6 +41,8 @@ Alle Funktionsänderungen und Verbesserungen werden hier dokumentiert:
 Damit die Automatik funktioniert, müssen folgende Entitäten vorhanden sein:
 
 - Tibber-Integration mit Preis & Prognose
+- https://www.secretisland.de/home-assistant-tibber-preise-15-minuten-intervall/ Webseite mit Anleitung
+  für die Preisinformationen im 15 Minuten Takt für Heute und Morgen.
 - PV-Leistungs-Sensor (z. B. Wechselrichter)
 - Netzbezug / Einspeisung
 - Zendure-Entitäten:
